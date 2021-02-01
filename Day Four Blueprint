@@ -1,0 +1,46 @@
+import requests
+import os
+
+print("Welcome to IsItDown.py!")
+print("Please write a URL or URLs you want to check. (seperated by comma)")
+
+def check_https(url):
+  if url.startswith('https://'):
+    url = url
+  else:
+    url = 'https://' + url
+    return url
+
+def check_url(url):
+  try:
+    requests.get(url).status_code
+    return True
+  except:
+    return False
+
+def y_n():
+  while True:
+    b = input("Do you want to start over? y/n ")
+    if b == "y":
+      break
+    elif b == "n":
+      print("ok, bye!")
+      break
+    else:
+      print("That's not a valid answer")
+      continue
+
+while True:
+  a = input()
+  case = a.split(',')
+  for a in case:
+    a = a.strip()
+    a = check_https(a)
+    if check_url(a) == True:
+      print(a + " is up!")
+    else:
+      if len(case) == 1:
+        print(a + " is not a valid URL.")
+      else: 
+        print(a + " is Down!")
+  y_n()
