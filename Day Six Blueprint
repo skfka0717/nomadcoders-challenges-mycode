@@ -1,0 +1,68 @@
+import os
+import requests
+from bs4 import BeautifulSoup
+from babel.numbers import format_currency
+
+os.system("clear")
+req = requests.get("https://www.iban.com/currency-codes")
+html = req.text
+soup = BeautifulSoup(html, 'html.parser')
+information = soup.find('tbody').find_all('tr')
+
+print('Welcome to CurrencyConvert PRP 2000')
+
+case = {}
+num = 0
+for i in information[:]:
+  i = i.get_text().strip()
+  test = i.split('\n')
+  box = [] # county, code 담을 리스트
+  if len(test) > 3: # code 없는거 걸러내기
+    box.append(test[0]) # county save
+    box.append(test[2]) # code save
+    case[f'{num}'] = box # 번호랑 짝지어 저장
+    num += 1
+
+for i in range(0,len(case)): # 리스트 출력
+  print('#', i, case[f'{i}'][0])
+
+print("\nWhere are you from? Choose a country by number.\n")
+
+first_country_num = input('#: ')
+first_country_num = int(first_country_num)
+print(case[f'{first_country_num}'][0]) # first contry 출력
+print("\nNow choose another country.\n")
+
+second_country_num = input('#: ')
+second_country_num = int(second_country_num)
+print(case[f'{second_country_num}'][0]) # second contry 출력
+print("\nHow many",case[f'{first_country_num}'][1],"do you want to convert to",case[f'{second_country_num}'][1],"?")
+
+how_many = input()
+if how_many.isalpha():
+  print("That wasn't a number.")
+else:
+  url = "https://transferwise.com/gb/currency-converter/"+case[f'{first_country_num}'][1]+"-to-"+case[f'{second_country_num}'][1]+"-rate?amount="+how_many
+  req = requests.get(url)
+  html = req.text
+  soup = BeautifulSoup(html, 'html.parser')
+  information = soup.find("span",{'class':'text-success'})
+
+  converter_value = information.get_text() # 환율값 입력
+  answer = float(how_many) * float(converter_value)
+
+  a = '{0:,}'.format(float(how_many))
+  b = '{0:,}'.format(float(answer))
+
+  final_answer = format_currency(answer, case[f'{second_country_num}'][1], locale="ko_KR")
+
+  print('\n'+url)
+  print(case[f'{first_country_num}'][1],a,'is',final_answer)
+
+"""
+Use the 'format_currency' function to format the output of the conversion
+format_currency(AMOUNT, CURRENCY_CODE, locale="ko_KR" (no need to change this one))
+
+
+print(format_currency(5000, "KRW", locale="ko_KR"))
+"""
