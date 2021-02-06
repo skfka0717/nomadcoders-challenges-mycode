@@ -1,0 +1,56 @@
+import os
+import csv
+import requests
+from bs4 import BeautifulSoup
+os.system("clear")
+
+alba_url = "http://www.alba.co.kr"
+req = requests.get(alba_url)
+html = req.text
+soup = BeautifulSoup(html, 'html.parser')
+
+information = soup.find('div',{'id':'MainSuperBrand'}).find('ul',{'class':'goodsBox'}).find_all('li') # 슈퍼 브랜드 크롤링
+
+adress_list = [] # 알바사이트 슈퍼브랜드 주소 리스트
+job_name_list=[] # 알바사이트 슈퍼브랜드명 리스트
+for i in information[:-1]: # 마지막에 주소가 아닌게 떠서 제거
+  job_name = i.find('a').find('span',{'class':'company'}).get_text()
+  job_name_list.append(job_name)
+  adress = i.find('a')['href']
+  adress_list.append(adress)
+
+count = len(adress_list) # 슈퍼 브랜드 주소 개수
+
+for j in range(0, count): # 주소랑 브랜드명 같이 쓰기 위해서
+  req_al = requests.get(adress_list[j]) # 슈퍼 브랜드 주소 하나씩 뽑기
+  html_al = req_al.text
+  soup_al = BeautifulSoup(html_al, 'html.parser')
+
+  job_list = soup_al.find('tbody').find_all('tr') # tr 묶음으로 저장
+
+  information_to_csv = [] # csv 로 저장할 리스트
+  try:
+    for p in job_list[::2]:
+      job_information = [] # 한 개 행
+      job_location = p.find('td', {'class':'local'}).get_text()
+      job_title = p.find('td', {'class':'title'}).find('span',{'class':'company'}).get_text()
+      job_data = p.find('td', {'class':'data'}).get_text()
+      job_pay = p.find('td', {'class':'pay'}).get_text()
+      job_regDate = p.find('td', {'class':'regDate last'}).get_text()
+      #print(job_location, job_title, job_data, job_pay, job_regDate)
+      job_information.append(job_location)
+      job_information.append(job_title)
+      job_information.append(job_data)
+      job_information.append(job_pay)
+      job_information.append(job_regDate)
+      information_to_csv.append(job_information)
+
+    file = open(f'{job_name_list[j]}.csv', mode="w")
+    writer = csv.writer(file)
+    writer.writerow(["place","title","time","pay","date"])
+    for info in information_to_csv:
+      writer.writerow(info)
+
+    print(job_name_list[j] + " DONE")
+  except:
+    print(job_name_list[j] + " no job")
