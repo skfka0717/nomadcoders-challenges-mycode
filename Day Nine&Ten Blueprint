@@ -1,0 +1,81 @@
+import requests, json
+from flask import Flask, render_template, request
+
+base_url = "http://hn.algolia.com/api/v1"
+
+# This URL gets the newest stories.
+new = f"{base_url}/search_by_date?tags=story"
+
+# This URL gets the most popular stories
+popular = f"{base_url}/search?tags=story"
+
+
+# This function makes the URL to get the detail of a storie by id.
+# Heres the documentation: https://hn.algolia.com/api
+def make_detail_url(id):
+  return f"{base_url}/items/{id}"
+
+#------------------------------------new api 에서 data 가져오기
+new_get = requests.get(new)
+json_new = json.loads(new_get.text)
+json_new_info = json_new['hits']
+
+new_news_list = []
+for i in json_new_info:
+  dict_caseN ={}
+  dict_caseN['title'] = i['title']
+  dict_caseN['url'] = i['url']
+  dict_caseN['author'] = i['author']
+  dict_caseN['points'] = i['points']
+  dict_caseN['comments'] = i['num_comments']
+  new_news_list.append(dict_caseN)
+'''  comment_get = requests.get(make_detail_url(i['objectID']))
+  json_comment = json.loads(comment_get.text)
+  json_comment_info = json_comment['children']'''
+#------------------------------------popular api 에서 data 가져오기
+popular_get = requests.get(popular)
+json_popular = json.loads(popular_get.text)
+json_popular_info = json_popular['hits']
+
+popular_news_list = []
+for i in json_popular_info:
+  dict_caseP ={}
+  dict_caseP['title'] = i['title']
+  dict_caseP['url'] = i['url']
+  dict_caseP['author'] = i['author']
+  dict_caseP['points'] = i['points']
+  dict_caseP['comments'] = i['num_comments']
+  popular_news_list.append(dict_caseP)
+  '''comment_get = requests.get(make_detail_url(i['objectID']))
+  json_comment = json.loads(comment_get.text)
+  json_comment_info = json_comment['children']'''
+
+app = Flask("DayNine")
+
+db = {}
+
+@app.route("/")
+def home():
+  word = request.args.get("order_by")
+  if word == "popular":
+    fromDB = db.get(word)
+    if fromDB:
+      return render_template("index.html",info=fromDB,page_title='Popular')
+    else:
+      db[word] = popular_news_list
+      return render_template("index.html",info=db[word],page_title='Popular')
+  elif word == 'new':
+    fromDB = db.get(word)
+    if fromDB:
+      return render_template("index.html",info=fromDB,page_title='New')
+    else:
+      db[word] = new_news_list
+      return render_template("index.html",info=db[word],page_title='New')  
+  else:
+    return render_template("index.html",info=popular_news_list,page_title='Popular')
+  
+  @app.route("<id>")
+  def comment():
+    return render_template("detail.html")
+
+app.run(host="0.0.0.0")
