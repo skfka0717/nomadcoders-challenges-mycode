@@ -1,0 +1,72 @@
+import requests
+from flask import Flask, render_template, request
+from bs4 import BeautifulSoup
+
+"""
+When you try to scrape reddit make sure to send the 'headers' on your request.
+Reddit blocks scrappers so we have to include these headers to make reddit think
+that we are a normal computer and not a python script.
+How to use: requests.get(url, headers=headers)
+"""
+
+headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36'}
+
+
+"""
+All subreddits have the same url:
+i.e : https://reddit.com/r/javascript
+You can add more subreddits to the list, just make sure they exist.
+To make a request, use this url:
+https://www.reddit.com/r/{subreddit}/top/?t=month
+This will give you the top posts in per month.
+"""
+
+subreddits = [
+    "javascript",
+    "reactjs",
+    "reactnative",
+    "programming",
+    "css",
+    "golang",
+    "flutter",
+    "rust",
+    "django"
+]
+
+app = Flask("DayEleven")
+
+@app.route("/")
+def home():
+  return render_template("home.html", subreddits=subreddits)
+
+@app.route("/read")
+def read():
+  select_list=[] # 선택한 subreddit 담을 리스트
+  for i in subreddits: # 선택한 subreddit 검색
+    if request.args.get(i): # home 이 아닌 read에서 args 를 불러와 처리
+      select_list.append(i)
+  post_subreddit = [] # 전제 subreddit post 담을 리스트
+  for i in select_list: # subreddit 하나씩 꺼내서 크롤링
+    req = requests.get("https://www.reddit.com/r/"+i+"/top/?t=month",  headers =headers) #header를 넣어주면 데이터 갖고올때 실패 안 뜸
+    soup = BeautifulSoup(req.text, "html.parser")
+    post_list = soup.find_all("div", {"class":"_1oQyIsiPHYt6nx7VOmd1sz"}) # post 담고 있는 전체 태그
+    for j in post_list:
+      post_case = {} # post 담을 작은 딕셔너리
+      post_case['subreddit'] = i #subreddit 이름
+      #error post_case['title'] = j.find("a", {"data-click-id":"body"}).find('h3').get_text()
+      post_case['title'] = j.find('h3',{'class':'_eYtD2XCVieq6emjKBH3m'}).get_text() # post 제목
+      #error post_case['link'] = "https://www.reddit.com"+j.find("a", {"data-click-id":"body"})['href']
+      post_case['link'] = j.find("a")['href'] # post comment link
+     
+      if j.find("div",{'class':'_1rZYMD_4xY3gRcSS3p8ODO'}).find('span',{'class':'D6SuXeSnAAagG8dKAb4O4'}):
+        post_case['vote'] = int(j.find("div",{'class':'_1rZYMD_4xY3gRcSS3p8ODO'}).find('span',{'class':'D6SuXeSnAAagG8dKAb4O4'}).get_text())
+      else:
+         post_case['vote'] = int(j.find("div",{'class':'_1rZYMD_4xY3gRcSS3p8ODO'}).get_text())
+      # vote 가 2가지로 나뉘어져 있음
+
+      post_subreddit.append(post_case) #하나의 post를 딕셔너리에 정리해 리스트에 추가
+
+    sort_post = sorted(post_subreddit, key=lambda x: (x['vote']), reverse=True) # 투표수 기준으로 내림차순 정렬
+  return render_template("read.html", select_list = select_list, all_post = sort_post)
+
+app.run(host="0.0.0.0")
