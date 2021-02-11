@@ -1,0 +1,88 @@
+import requests, csv
+from flask import Flask, render_template, request, send_file, redirect
+from bs4 import BeautifulSoup
+
+"""
+These are the URLs that will give you remote jobs for the word 'python'
+
+https://stackoverflow.com/jobs?r=true&q=python
+https://weworkremotely.com/remote-jobs/search?term=python
+https://remoteok.io/remote-dev+python-jobs
+
+Good luck!
+"""
+
+headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36'}
+
+app = Flask("RemoteJobs")
+db = {} # fakeDB
+
+@app.route("/")
+def home():
+  return render_template("index.html")
+
+@app.route("/search")
+def search():
+  SearchingJob = request.args.get("SearchingBy").lower() # 입력값
+  all_list = [] # 전체 담을 리스트
+
+  fromDB = db.get(SearchingJob)
+  if fromDB: # db 에 데이터가 있으면
+    return render_template("detail.html", joblist=db[SearchingJob],SearchingJob=SearchingJob, jobCount=len(db[SearchingJob]))
+  else: # db 에 데이터가 없으면
+    req1 = requests.get("https://stackoverflow.com/jobs?r=true&q="+SearchingJob, headers = headers)
+    req2 = requests.get("https://weworkremotely.com/remote-jobs/search?term="+SearchingJob, headers = headers)
+    req3 = requests.get("https://remoteok.io/remote-dev+"+SearchingJob+"-jobs", headers = headers)
+
+    soup1 = BeautifulSoup(req1.text, "html.parser")
+    soup2 = BeautifulSoup(req2.text, "html.parser")
+    soup3 = BeautifulSoup(req3.text, "html.parser")
+  # 첫번째 사이트 크롤링(출력 텍스트 수정)
+    joblist1 = soup1.find('div',{'class':'listResults'}).find_all('div',{'class':'-job'})
+    for i in joblist1:
+      small_case = {}
+      small_case['title'] = i.find('a',{'class':'s-link stretched-link'}).get_text().replace('\xa0','')
+      small_case['link'] = "https://stackoverflow.com"+i.find('a',{'class':'s-link stretched-link'})['href']
+      small_case['company'] = i.find('h3',{'class':'fc-black-700 fs-body1 mb4'}).find('span').get_text().split('\r\n')[0].replace('\xa0','')
+      all_list.append(small_case) # 리스트에 추가
+    
+  # 두번째 사이트 크롤링(링크 찾기 곤란함)
+    joblist2 = soup2.find('section',{'id':'category-2'}).find_all('li',{'class':'feature'})
+    for i in joblist2:
+      small_case = {}
+      small_case['title'] = i.find('span',{'class':'title'}).get_text()
+      if len(i.find_all('a')) > 1 :
+        small_case['link'] = "https://weworkremotely.com"+i.find_all('a')[1]['href']
+      else:
+        small_case['link'] = "https://weworkremotely.com"+i.find_all('a')[0]['href']
+      small_case['company'] = i.find('span',{'class':'company'}).get_text()
+      all_list.append(small_case) # 리스트에 추가
+
+  # 세번째 사이트 크롤링(정상)
+    joblist3 = soup3.find('table',{'id':'jobsboard'}).find_all('tr',{'class':'job'})
+    for i in joblist3:
+      small_case = {}
+      small_case['title'] = i.find('h2',{'itemprop':'title'}).get_text()
+      small_case['link'] = "https://remoteok.io"+i.find('a',{'class':'preventLink'})['href']
+      small_case['company'] = i.find('a',{'itemprop':'hiringOrganization'}).get_text()
+      all_list.append(small_case) # 리스트에 추가
+    db[SearchingJob] = all_list
+    return render_template("detail.html", joblist=db[SearchingJob],SearchingJob=SearchingJob, jobCount=len(db[SearchingJob]))
+
+@app.route("/export")
+def export():
+  SearchingJob = request.args.get("SearchingBy").lower()
+  try:
+    if db[SearchingJob]:
+      # csv 저장
+      file = open(f'{SearchingJob}.csv', mode='w')
+      writer = csv.writer(file)
+      writer.writerow(['Title','Company','Link'])
+      for i in db[SearchingJob]:
+        writer.writerow([i['title'],i['company'],i['link']])
+      file.close()
+      return send_file(f'{SearchingJob}.csv', mimetype='application/x-csv', attachment_filename=f'{SearchingJob}.csv', as_attachment=True)
+  except:
+    return redirect("/")
+
+app.run(host="0.0.0.0")
